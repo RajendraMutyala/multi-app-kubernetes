@@ -1,4 +1,3 @@
-
 name: Build and Push Docker Images
 
 on:
@@ -78,3 +77,23 @@ jobs:
         run: |
           echo "All four Docker images have been pushed."
           echo "Image tag: $GITHUB_SHA"
+
+      # Step 10: Update Frontend Deployment Image
+      - name: Update Kubernetes Frontend
+        run: |
+          kubectl set image deployment/frontend frontend=${{ steps.image.outputs.prefix }}-frontend:${{ github.sha }} -n multi-app
+
+      # Step 11: Update Login Deployment Image
+      - name: Update Kubernetes Login
+        run: |
+          kubectl set image deployment/login login=${{ steps.image.outputs.prefix }}-login:${{ github.sha }} -n multi-app
+
+      # Step 12: Update Payment Deployment Image
+      - name: Update Kubernetes Payment
+        run: |
+          kubectl set image deployment/payment payment=${{ steps.image.outputs.prefix }}-payment:${{ github.sha }} -n multi-app
+
+      # Step 13: Update Product Deployment Image
+      - name: Update Kubernetes Product
+        run: |
+          kubectl set image deployment/product product=${{ steps.image.outputs.prefix }}-product:${{ github.sha }} -n multi-app
