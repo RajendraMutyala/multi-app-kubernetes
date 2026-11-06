@@ -1,0 +1,129 @@
+name: Build and Deploy Applications
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-deploy:
+    name: Build Push and Deploy
+    runs-on: self-hosted
+
+    steps:
+      # Checkout source code
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Generate lowercase image prefix
+      - name: Prepare Image Names
+        id: image
+        shell: bash
+        run: |
+          OWNER_REPO=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          echo "prefix=ghcr.io/${OWNER_REPO}" >> "$GITHUB_OUTPUT"
+
+      # Setup Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Login to GHCR
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build Frontend
+      - name: Build and Push Frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.image.outputs.prefix }}-frontend:${{ github.sha }}
+
+      # Build Login
+      - name: Build and Push Login
+        uses: docker/build-push-action@v6
+        with:
+          context: ./login
+          push: true
+          tags: ${{ steps.image.outputs.prefix }}-login:${{ github.sha }}
+
+      # Build Payment
+      - name: Build and Push Payment
+        uses: docker/build-push-action@v6
+        with:
+          context: ./payment
+          push: true
+          tags: ${{ steps.image.outputs.prefix }}-payment:${{ github.sha }}
+
+      # Build Product
+      - name: Build and Push Product
+        uses: docker/build-push-action@v6
+        with:
+          context: ./product
+          push: true
+          tags: ${{ steps.image.outputs.prefix }}-product:${{ github.sha }}
+
+      # Verify Cluster Connectivity
+      - name: Verify Kubernetes Cluster
+        run: |
+          kubectl config current-context
+          kubectl get nodes
+          kubectl get namespaces
+
+      # Create/Update Namespace, Deployments and Services
+      - name: Apply Kubernetes Manifests
+        run: |
+          kubectl apply -f k8s/
+
+      # Update Frontend Image
+      - name: Update Frontend Image
+        run: |
+          kubectl set image deployment/frontend \
+          frontend=${{ steps.image.outputs.prefix }}-frontend:${{ github.sha }} \
+          -n multi-app
+
+      # Update Login Image
+      - name: Update Login Image
+        run: |
+          kubectl set image deployment/login \
+          login=${{ steps.image.outputs.prefix }}-login:${{ github.sha }} \
+          -n multi-app
+
+      # Update Payment Image
+      - name: Update Payment Image
+        run: |
+          kubectl set image deployment/payment \
+          payment=${{ steps.image.outputs.prefix }}-payment:${{ github.sha }} \
+          -n multi-app
+
+      # Update Product Image
+      - name: Update Product Image
+        run: |
+          kubectl set image deployment/product \
+          product=${{ steps.image.outputs.prefix }}-product:${{ github.sha }} \
+          -n multi-app
+
+      # Verify Rollout
+      - name: Verify Deployment
+        run: |
+          kubectl rollout status deployment/frontend -n multi-app
+          kubectl rollout status deployment/login -n multi-app
+          kubectl rollout status deployment/payment -n multi-app
+          kubectl rollout status deployment/product -n multi-app
+
+      # Display Running Resources
+      - name: Display Cluster Resources
+        run: |
+          kubectl get namespaces
+          kubectl get deployments -n multi-app
+          kubectl get services -n multi-app
+          kubectl get pods -n multi-app
