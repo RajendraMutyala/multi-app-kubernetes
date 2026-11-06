@@ -16,7 +16,7 @@ def home():
     <html>
       <head><title>Multi-App Website</title></head>
       <body>
-        <h1>Hello, from my CI/CD kubernetes Project - Version 4!</h1>
+        <h1>This is CI/CD kubernetes Project - Version 5!</h1>
         <h1>Welcome to My Multi-App Website</h1>
         <p>Deployed with Docker, Kubernetes and GitHub Actions.</p>
         <ul>
