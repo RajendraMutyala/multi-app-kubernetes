@@ -7,7 +7,7 @@ spec:
   ingressClassName: nginx
 
   rules:
-  - host: multiapp.local
+  - host: 
 
     http:
       paths:
