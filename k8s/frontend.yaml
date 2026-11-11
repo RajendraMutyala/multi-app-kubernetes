@@ -55,7 +55,7 @@ metadata:
   name: frontend-service
   namespace: multi-app
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: frontend
 
