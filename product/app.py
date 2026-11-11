@@ -13,7 +13,7 @@ PRODUCTS = [
 
 @app.route("/")
 def home():
-    return "<h1>Product Application</h1><p>Product service is running.</p>"
+    return "<h1>Product Application is running</h1><p>Product service is running.</p>"
 
 
 @app.route("/products")
