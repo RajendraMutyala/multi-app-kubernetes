@@ -23,10 +23,10 @@ spec:
           image: multi-frontend:v1
           imagePullPolicy: IfNotPresent
            resources:
-            requests:
+           requests:
               cpu: "50m"
               memory: "64Mi"
-            limits:
+           limits:
               cpu: "250m"
               memory: "128Mi"
           ports:
