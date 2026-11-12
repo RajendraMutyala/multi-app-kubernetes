@@ -1,3 +1,4 @@
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -5,32 +6,46 @@ metadata:
   namespace: multi-app
 spec:
   replicas: 2
+  revisionHistoryLimit: 5
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+
   selector:
     matchLabels:
       app: product
+
   template:
     metadata:
       labels:
         app: product
+
     spec:
       containers:
         - name: product
           image: multi-product:v1
           imagePullPolicy: IfNotPresent
+
           ports:
             - containerPort: 5002
+
           readinessProbe:
             httpGet:
               path: /health
               port: 5002
             initialDelaySeconds: 5
             periodSeconds: 10
+
           livenessProbe:
             httpGet:
               path: /health
               port: 5002
             initialDelaySeconds: 10
             periodSeconds: 20
+
 ---
 apiVersion: v1
 kind: Service
@@ -44,3 +59,4 @@ spec:
   ports:
     - port: 5002
       targetPort: 5002
+      protocol: TCP
