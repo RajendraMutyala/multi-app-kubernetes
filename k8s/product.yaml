@@ -1,4 +1,3 @@
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -28,11 +27,12 @@ spec:
         - name: product
           image: multi-product:v1
           imagePullPolicy: IfNotPresent
-           resources:
-           requests:
+
+          resources:
+            requests:
               cpu: "50m"
               memory: "64Mi"
-           limits:
+            limits:
               cpu: "250m"
               memory: "128Mi"
 
