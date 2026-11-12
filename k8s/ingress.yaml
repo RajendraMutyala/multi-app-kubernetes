@@ -3,12 +3,12 @@ kind: Ingress
 metadata:
   name: multi-app-ingress
   namespace: multi-app
+
 spec:
   ingressClassName: nginx
 
   rules:
-  - host: 
-
+  - host: multiapp.local
     http:
       paths:
 
