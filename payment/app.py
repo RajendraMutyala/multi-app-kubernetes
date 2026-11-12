@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "<h1>Payment Application</h1><p>Payment service is running.</p>"
+    return "<h1>Payment Application</h1><p>Payment service is good and running.</p>"
 
 
 @app.route("/payment")
