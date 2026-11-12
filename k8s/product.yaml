@@ -28,6 +28,13 @@ spec:
         - name: product
           image: multi-product:v1
           imagePullPolicy: IfNotPresent
+           resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "128Mi"
 
           ports:
             - containerPort: 5002
