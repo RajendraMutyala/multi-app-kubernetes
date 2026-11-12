@@ -1,4 +1,3 @@
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -31,11 +30,13 @@ spec:
         - name: login
           image: multi-login:v1
           imagePullPolicy: IfNotPresent
-           resources:
-           requests:
+
+          # CPU and memory resource management
+          resources:
+            requests:
               cpu: "50m"
               memory: "64Mi"
-           limits:
+            limits:
               cpu: "250m"
               memory: "128Mi"
 
