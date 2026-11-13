@@ -28,6 +28,32 @@ spec:
           image: multi-product:v1
           imagePullPolicy: IfNotPresent
 
+          serviceAccountName: product-sa
+             automountServiceAccountToken: false
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+             drop:
+               - ALL
+
+           env:
+             - name: PYTHONDONTWRITEBYTECODE
+               value: "1"
+
+           volumeMounts:
+             - name: tmp
+               mountPath: /tmp
+
           resources:
             requests:
               cpu: "50m"
@@ -52,6 +78,10 @@ spec:
               port: 5002
             initialDelaySeconds: 10
             periodSeconds: 20
+
+          volumes:
+            - name: tmp
+              emptyDir: {}
 
 ---
 apiVersion: v1
