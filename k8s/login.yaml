@@ -54,6 +54,18 @@ spec:
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
 
+            - name: USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: login-credentials
+                  key: USERNAME
+
+            - name: PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: login-credentials
+                  key: PASSWORD
+
           volumeMounts:
             - name: tmp
               mountPath: /tmp
