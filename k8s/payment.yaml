@@ -23,35 +23,37 @@ spec:
         app: payment
 
     spec:
+      # pod level fields
+      serviceAccountName: payment-sa
+      automountServiceAccountToken: false
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+
       containers:
         - name: payment
           image: multi-payment:v1
           imagePullPolicy: IfNotPresent
 
-          serviceAccountName: payment-sa
-          automountServiceAccountToken: false
-
+          # container level security
           securityContext:
-            runAsNonRoot: true
-            runAsUser: 10001
-            runAsGroup: 10001
-            seccompProfile:
-              type: RuntimeDefault
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
 
-            securityContext:
-              allowPrivilegeEscalation: false
-              readOnlyRootFilesystem: true
-              capabilities:
-                drop:
-                  - ALL
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
 
-            env:
-              - name: PYTHONDONTWRITEBYTECODE
-                value: "1"
-
-            volumeMounts:
-               - name: tmp
-                 mountPath: /tmp
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
 
           resources:
             requests:
@@ -63,10 +65,6 @@ spec:
 
           ports:
             - containerPort: 5001
-
-          volumes:
-            - name: tmp
-              emptyDir: {}
 
           readinessProbe:
             httpGet:
@@ -81,6 +79,11 @@ spec:
               port: 5001
             initialDelaySeconds: 10
             periodSeconds: 20
+
+      # pod level: same indentation as "containers:"
+      volumes:
+        - name: tmp
+          emptyDir: {}
 
 ---
 apiVersion: v1
