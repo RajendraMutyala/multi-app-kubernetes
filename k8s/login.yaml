@@ -26,40 +26,37 @@ spec:
         app: login
 
     spec:
+      # pod level fields
+      serviceAccountName: login-sa
+      automountServiceAccountToken: false
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+
       containers:
         - name: login
           image: multi-login:v1
           imagePullPolicy: IfNotPresent
 
-          serviceAccountName: login-sa
-          automountServiceAccountToken: false
-
+          # container level security
           securityContext:
-            runAsNonRoot: true
-            runAsUser: 10001
-            runAsGroup: 10001
-            seccompProfile:
-              type: RuntimeDefault
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
 
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
 
-            securityContext:
-              allowPrivilegeEscalation: false
-              readOnlyRootFilesystem: true
-              capabilities:
-                drop:
-                  - ALL
-
-            env:
-              - name: PYTHONDONTWRITEBYTECODE
-                value: "1"
-
-            volumeMounts:
-              - name: tmp
-                mountPath: /tmp
-
-            volumes:
-              - name: tmp
-                emptyDir: {}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
 
           # CPU and memory resource management
           resources:
@@ -86,6 +83,11 @@ spec:
               port: 5000
             initialDelaySeconds: 10
             periodSeconds: 20
+
+      # pod level: same indentation as "containers:"
+      volumes:
+        - name: tmp
+          emptyDir: {}
 
 ---
 apiVersion: v1
