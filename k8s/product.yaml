@@ -23,36 +23,37 @@ spec:
         app: product
 
     spec:
+      # pod level fields
+      serviceAccountName: product-sa
+      automountServiceAccountToken: false
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+
       containers:
         - name: product
           image: multi-product:v1
           imagePullPolicy: IfNotPresent
 
-          serviceAccountName: product-sa
-             automountServiceAccountToken: false
-
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 10001
-            runAsGroup: 10001
-            seccompProfile:
-              type: RuntimeDefault
-
-
+          # container level security
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
-             drop:
-               - ALL
+              drop:
+                - ALL
 
-           env:
-             - name: PYTHONDONTWRITEBYTECODE
-               value: "1"
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
 
-           volumeMounts:
-             - name: tmp
-               mountPath: /tmp
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
 
           resources:
             requests:
@@ -79,9 +80,10 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 20
 
-          volumes:
-            - name: tmp
-              emptyDir: {}
+      # pod level: same indentation as "containers:"
+      volumes:
+        - name: tmp
+          emptyDir: {}
 
 ---
 apiVersion: v1
