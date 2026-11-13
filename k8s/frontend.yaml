@@ -23,6 +23,16 @@ spec:
         app: frontend
 
     spec:
+      serviceAccountName: frontend-sa
+      automountServiceAccountToken: false
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      
       containers:
         - name: frontend
           image: multi-frontend:v1
@@ -39,6 +49,25 @@ spec:
 
           ports:
             - containerPort: 8000
+
+          securityContext:
+             allowPrivilegeEscalation: false
+             readOnlyRootFilesystem: true
+             capabilities:
+               drop:
+                 - ALL
+
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+          volumes:
+            - name: tmp
+              emptyDir: {}
 
 ---
 apiVersion: v1
