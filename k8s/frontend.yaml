@@ -32,7 +32,7 @@ spec:
         runAsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
-      
+
       containers:
         - name: frontend
           image: multi-frontend:v1
@@ -51,11 +51,11 @@ spec:
             - containerPort: 8000
 
           securityContext:
-             allowPrivilegeEscalation: false
-             readOnlyRootFilesystem: true
-             capabilities:
-               drop:
-                 - ALL
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
 
           env:
             - name: PYTHONDONTWRITEBYTECODE
@@ -65,9 +65,10 @@ spec:
             - name: tmp
               mountPath: /tmp
 
-          volumes:
-            - name: tmp
-              emptyDir: {}
+      # pod level: same indentation as "containers:"
+      volumes:
+        - name: tmp
+          emptyDir: {}
 
 ---
 apiVersion: v1
@@ -82,5 +83,4 @@ spec:
   ports:
     - port: 8000
       targetPort: 8000
-      nodePort: 30080
       protocol: TCP
