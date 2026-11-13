@@ -28,6 +28,31 @@ spec:
           image: multi-payment:v1
           imagePullPolicy: IfNotPresent
 
+          serviceAccountName: payment-sa
+          automountServiceAccountToken: false
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                  - ALL
+
+            env:
+              - name: PYTHONDONTWRITEBYTECODE
+                value: "1"
+
+            volumeMounts:
+               - name: tmp
+                 mountPath: /tmp
+
           resources:
             requests:
               cpu: "50m"
@@ -38,6 +63,10 @@ spec:
 
           ports:
             - containerPort: 5001
+
+          volumes:
+            - name: tmp
+              emptyDir: {}
 
           readinessProbe:
             httpGet:
