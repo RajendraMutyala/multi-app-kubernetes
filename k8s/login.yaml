@@ -31,6 +31,36 @@ spec:
           image: multi-login:v1
           imagePullPolicy: IfNotPresent
 
+          serviceAccountName: login-sa
+          automountServiceAccountToken: false
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+
+
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                  - ALL
+
+            env:
+              - name: PYTHONDONTWRITEBYTECODE
+                value: "1"
+
+            volumeMounts:
+              - name: tmp
+                mountPath: /tmp
+
+            volumes:
+              - name: tmp
+                emptyDir: {}
+
           # CPU and memory resource management
           resources:
             requests:
