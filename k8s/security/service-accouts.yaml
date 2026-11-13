@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: frontend-sa
+  namespace: multi-app
+automountServiceAccountToken: false
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: login-sa
+  namespace: multi-app
+automountServiceAccountToken: false
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: product-sa
+  namespace: multi-app
+automountServiceAccountToken: false
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: payment-sa
+  namespace: multi-app
+automountServiceAccountToken: false
