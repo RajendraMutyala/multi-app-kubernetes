@@ -1,4 +1,3 @@
-
 name: Build, Scan and Deploy Applications
 
 on:
@@ -17,6 +16,7 @@ jobs:
     runs-on: self-hosted
 
     steps:
+
       # 1. Checkout source code
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -41,36 +41,36 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 5. Build and Push Frontend
-      - name: Build and Push Frontend
+      # 5. Build Frontend Image Locally
+      - name: Build Frontend
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
-          push: true
+          load: true
           tags: ${{ steps.image.outputs.prefix }}-frontend:${{ github.sha }}
 
-      # 6. Build and Push Login
-      - name: Build and Push Login
+      # 6. Build Login Image Locally
+      - name: Build Login
         uses: docker/build-push-action@v6
         with:
           context: ./login
-          push: true
+          load: true
           tags: ${{ steps.image.outputs.prefix }}-login:${{ github.sha }}
 
-      # 7. Build and Push Payment
-      - name: Build and Push Payment
+      # 7. Build Payment Image Locally
+      - name: Build Payment
         uses: docker/build-push-action@v6
         with:
           context: ./payment
-          push: true
+          load: true
           tags: ${{ steps.image.outputs.prefix }}-payment:${{ github.sha }}
 
-      # 8. Build and Push Product
-      - name: Build and Push Product
+      # 8. Build Product Image Locally
+      - name: Build Product
         uses: docker/build-push-action@v6
         with:
           context: ./product
-          push: true
+          load: true
           tags: ${{ steps.image.outputs.prefix }}-product:${{ github.sha }}
 
       # 9. Trivy Filesystem Scan
@@ -128,47 +128,55 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
 
-      # 14. Verify Cluster Connectivity
+      # 14. Push Images to GHCR after successful scans
+      - name: Push Images to GHCR
+        run: |
+          docker push ${{ steps.image.outputs.prefix }}-frontend:${{ github.sha }}
+          docker push ${{ steps.image.outputs.prefix }}-login:${{ github.sha }}
+          docker push ${{ steps.image.outputs.prefix }}-payment:${{ github.sha }}
+          docker push ${{ steps.image.outputs.prefix }}-product:${{ github.sha }}
+
+      # 15. Verify Kubernetes Cluster
       - name: Verify Kubernetes Cluster
         run: |
           kubectl config current-context
           kubectl get nodes
           kubectl get namespaces
 
-      # 15. Apply Kubernetes Manifests
+      # 16. Apply Kubernetes Manifests
       - name: Apply Kubernetes Manifests
         run: |
           kubectl apply -f k8s/
 
-      # 16. Update Frontend Image
+      # 17. Update Frontend Image
       - name: Update Frontend Image
         run: |
           kubectl set image deployment/frontend \
           frontend=${{ steps.image.outputs.prefix }}-frontend:${{ github.sha }} \
           -n multi-app
 
-      # 17. Update Login Image
+      # 18. Update Login Image
       - name: Update Login Image
         run: |
           kubectl set image deployment/login \
           login=${{ steps.image.outputs.prefix }}-login:${{ github.sha }} \
           -n multi-app
 
-      # 18. Update Payment Image
+      # 19. Update Payment Image
       - name: Update Payment Image
         run: |
           kubectl set image deployment/payment \
           payment=${{ steps.image.outputs.prefix }}-payment:${{ github.sha }} \
           -n multi-app
 
-      # 19. Update Product Image
+      # 20. Update Product Image
       - name: Update Product Image
         run: |
           kubectl set image deployment/product \
           product=${{ steps.image.outputs.prefix }}-product:${{ github.sha }} \
           -n multi-app
 
-      # 20. Verify Rollout
+      # 21. Verify Deployment Rollouts
       - name: Verify Deployment
         run: |
           kubectl rollout status deployment/frontend -n multi-app
@@ -176,7 +184,7 @@ jobs:
           kubectl rollout status deployment/payment -n multi-app
           kubectl rollout status deployment/product -n multi-app
 
-      # 21. Display Running Resources
+      # 22. Display Cluster Resources
       - name: Display Cluster Resources
         run: |
           kubectl get namespaces
