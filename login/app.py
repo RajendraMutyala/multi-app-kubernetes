@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "<h1>Login Application</h1><p>Login service is running.</p>"
+    return "<h1>Login Application</h1><p>Login service is up and running.</p>"
 
 
 @app.route("/login")
