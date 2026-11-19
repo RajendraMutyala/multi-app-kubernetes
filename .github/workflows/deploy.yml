@@ -1,4 +1,5 @@
-name: Build and Deploy Applications
+
+name: Build, Scan and Deploy Applications
 
 on:
   push:
@@ -12,15 +13,15 @@ permissions:
 
 jobs:
   build-and-deploy:
-    name: Build Push and Deploy
+    name: Build, Scan and Deploy
     runs-on: self-hosted
 
     steps:
-      # Checkout source code
+      # 1. Checkout source code
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Generate lowercase image prefix
+      # 2. Generate lowercase image prefix
       - name: Prepare Image Names
         id: image
         shell: bash
@@ -28,11 +29,11 @@ jobs:
           OWNER_REPO=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
           echo "prefix=ghcr.io/${OWNER_REPO}" >> "$GITHUB_OUTPUT"
 
-      # Setup Docker Buildx
+      # 3. Setup Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Login to GHCR
+      # 4. Login to GHCR
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -40,7 +41,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Build Frontend
+      # 5. Build and Push Frontend
       - name: Build and Push Frontend
         uses: docker/build-push-action@v6
         with:
@@ -48,7 +49,7 @@ jobs:
           push: true
           tags: ${{ steps.image.outputs.prefix }}-frontend:${{ github.sha }}
 
-      # Build Login
+      # 6. Build and Push Login
       - name: Build and Push Login
         uses: docker/build-push-action@v6
         with:
@@ -56,7 +57,7 @@ jobs:
           push: true
           tags: ${{ steps.image.outputs.prefix }}-login:${{ github.sha }}
 
-      # Build Payment
+      # 7. Build and Push Payment
       - name: Build and Push Payment
         uses: docker/build-push-action@v6
         with:
@@ -64,7 +65,7 @@ jobs:
           push: true
           tags: ${{ steps.image.outputs.prefix }}-payment:${{ github.sha }}
 
-      # Build Product
+      # 8. Build and Push Product
       - name: Build and Push Product
         uses: docker/build-push-action@v6
         with:
@@ -72,47 +73,102 @@ jobs:
           push: true
           tags: ${{ steps.image.outputs.prefix }}-product:${{ github.sha }}
 
-      # Verify Cluster Connectivity
+      # 9. Trivy Filesystem Scan
+      - name: Trivy Filesystem Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+
+      # 10. Trivy Frontend Image Scan
+      - name: Trivy Frontend Image Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.image.outputs.prefix }}-frontend:${{ github.sha }}
+          scan-type: image
+          severity: HIGH,CRITICAL
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+
+      # 11. Trivy Login Image Scan
+      - name: Trivy Login Image Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.image.outputs.prefix }}-login:${{ github.sha }}
+          scan-type: image
+          severity: HIGH,CRITICAL
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+
+      # 12. Trivy Payment Image Scan
+      - name: Trivy Payment Image Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.image.outputs.prefix }}-payment:${{ github.sha }}
+          scan-type: image
+          severity: HIGH,CRITICAL
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+
+      # 13. Trivy Product Image Scan
+      - name: Trivy Product Image Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.image.outputs.prefix }}-product:${{ github.sha }}
+          scan-type: image
+          severity: HIGH,CRITICAL
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+
+      # 14. Verify Cluster Connectivity
       - name: Verify Kubernetes Cluster
         run: |
           kubectl config current-context
           kubectl get nodes
           kubectl get namespaces
 
-      # Create/Update Namespace, Deployments and Services
+      # 15. Apply Kubernetes Manifests
       - name: Apply Kubernetes Manifests
         run: |
           kubectl apply -f k8s/
 
-      # Update Frontend Image
+      # 16. Update Frontend Image
       - name: Update Frontend Image
         run: |
           kubectl set image deployment/frontend \
           frontend=${{ steps.image.outputs.prefix }}-frontend:${{ github.sha }} \
           -n multi-app
 
-      # Update Login Image
+      # 17. Update Login Image
       - name: Update Login Image
         run: |
           kubectl set image deployment/login \
           login=${{ steps.image.outputs.prefix }}-login:${{ github.sha }} \
           -n multi-app
 
-      # Update Payment Image
+      # 18. Update Payment Image
       - name: Update Payment Image
         run: |
           kubectl set image deployment/payment \
           payment=${{ steps.image.outputs.prefix }}-payment:${{ github.sha }} \
           -n multi-app
 
-      # Update Product Image
+      # 19. Update Product Image
       - name: Update Product Image
         run: |
           kubectl set image deployment/product \
           product=${{ steps.image.outputs.prefix }}-product:${{ github.sha }} \
           -n multi-app
 
-      # Verify Rollout
+      # 20. Verify Rollout
       - name: Verify Deployment
         run: |
           kubectl rollout status deployment/frontend -n multi-app
@@ -120,7 +176,7 @@ jobs:
           kubectl rollout status deployment/payment -n multi-app
           kubectl rollout status deployment/product -n multi-app
 
-      # Display Running Resources
+      # 21. Display Running Resources
       - name: Display Cluster Resources
         run: |
           kubectl get namespaces
