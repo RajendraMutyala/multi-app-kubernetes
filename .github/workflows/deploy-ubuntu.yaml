@@ -1,0 +1,286 @@
+name: Build, Scan and Deploy to EC2 KIND
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+# Prevent two deployments from changing the same cluster simultaneously.
+concurrency:
+  group: ec2-kind-multi-app-deployment
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Build, Scan and Deploy
+    # This selects a Linux self-hosted runner, not your Mac runner.
+    runs-on: [self-hosted, linux, x64]
+
+    env:
+      KIND_CLUSTER_NAME: kind
+      NAMESPACE: multi-app
+
+    steps:
+
+      # 1. Checkout repository
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Verify EC2 tools and Docker
+      - name: Check EC2 Environment
+        shell: bash
+        run: |
+          set -e
+
+          echo "Runner user:"
+          whoami
+
+          echo "Operating system:"
+          uname -a
+
+          echo "Docker:"
+          command -v docker
+          docker context show
+          docker info
+
+          echo "KIND:"
+          command -v kind
+          kind version
+
+          echo "kubectl:"
+          command -v kubectl
+          kubectl version --client
+
+      # 3. Generate lowercase GHCR image names
+      - name: Prepare Image Names
+        id: image
+        shell: bash
+        run: |
+          OWNER_REPO=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          echo "prefix=ghcr.io/${OWNER_REPO}" >> "$GITHUB_OUTPUT"
+
+      # 4. Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
+
+      # 5. Login to GitHub Container Registry
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 6. Build Frontend image
+      - name: Build Frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          load: true
+          tags: ${{ steps.image.outputs.prefix }}-frontend:${{ github.sha }}
+
+      # 7. Build Login image
+      - name: Build Login
+        uses: docker/build-push-action@v6
+        with:
+          context: ./login
+          load: true
+          tags: ${{ steps.image.outputs.prefix }}-login:${{ github.sha }}
+
+      # 8. Build Payment image
+      - name: Build Payment
+        uses: docker/build-push-action@v6
+        with:
+          context: ./payment
+          load: true
+          tags: ${{ steps.image.outputs.prefix }}-payment:${{ github.sha }}
+
+      # 9. Build Product image
+      - name: Build Product
+        uses: docker/build-push-action@v6
+        with:
+          context: ./product
+          load: true
+          tags: ${{ steps.image.outputs.prefix }}-product:${{ github.sha }}
+
+      # 10. Verify locally built images
+      - name: Verify Docker Images
+        shell: bash
+        run: |
+          set -e
+
+          echo "Docker context:"
+          docker context show
+
+          echo "Built images:"
+          docker images
+
+          docker image inspect "${{ steps.image.outputs.prefix }}-frontend:${{ github.sha }}"
+          docker image inspect "${{ steps.image.outputs.prefix }}-login:${{ github.sha }}"
+          docker image inspect "${{ steps.image.outputs.prefix }}-payment:${{ github.sha }}"
+          docker image inspect "${{ steps.image.outputs.prefix }}-product:${{ github.sha }}"
+
+      # 11. Scan repository files
+      - name: Trivy Filesystem Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+
+      # 12. Scan Frontend image
+      - name: Trivy Frontend Image Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: image
+          image-ref: ${{ steps.image.outputs.prefix }}-frontend:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+
+      # 13. Scan Login image
+      - name: Trivy Login Image Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: image
+          image-ref: ${{ steps.image.outputs.prefix }}-login:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+
+      # 14. Scan Payment image
+      - name: Trivy Payment Image Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: image
+          image-ref: ${{ steps.image.outputs.prefix }}-payment:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+
+      # 15. Scan Product image
+      - name: Trivy Product Image Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: image
+          image-ref: ${{ steps.image.outputs.prefix }}-product:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+
+      # 16. Push images only after all scans pass
+      - name: Push Images to GHCR
+        shell: bash
+        run: |
+          set -e
+
+          docker push "${{ steps.image.outputs.prefix }}-frontend:${{ github.sha }}"
+          docker push "${{ steps.image.outputs.prefix }}-login:${{ github.sha }}"
+          docker push "${{ steps.image.outputs.prefix }}-payment:${{ github.sha }}"
+          docker push "${{ steps.image.outputs.prefix }}-product:${{ github.sha }}"
+
+      # 17. Export the KIND kubeconfig for the EC2 runner user
+      - name: Configure KIND Kubeconfig
+        shell: bash
+        run: |
+          set -e
+
+          echo "Available KIND clusters:"
+          kind get clusters
+
+          echo "Exporting kubeconfig for cluster: ${KIND_CLUSTER_NAME}"
+          mkdir -p "$HOME/.kube"
+          kind export kubeconfig --name "${KIND_CLUSTER_NAME}"
+          chmod 600 "$HOME/.kube/config"
+
+          echo "Current Kubernetes context:"
+          kubectl config current-context
+
+      # 18. Verify Kubernetes connectivity
+      - name: Verify Kubernetes Cluster
+        shell: bash
+        run: |
+          set -e
+
+          kubectl get nodes
+          kubectl get namespaces
+
+          echo "Checking application namespace:"
+          kubectl get namespace "${NAMESPACE}"
+
+      # 19. Apply Kubernetes manifests
+      - name: Apply Kubernetes Manifests
+        shell: bash
+        run: |
+          set -e
+          kubectl apply -f k8s/
+
+      # 20. Update Frontend deployment
+      - name: Update Frontend Image
+        run: |
+          kubectl set image deployment/frontend \
+            frontend=${{ steps.image.outputs.prefix }}-frontend:${{ github.sha }} \
+            -n "${NAMESPACE}"
+
+      # 21. Update Login deployment
+      - name: Update Login Image
+        run: |
+          kubectl set image deployment/login \
+            login=${{ steps.image.outputs.prefix }}-login:${{ github.sha }} \
+            -n "${NAMESPACE}"
+
+      # 22. Update Payment deployment
+      - name: Update Payment Image
+        run: |
+          kubectl set image deployment/payment \
+            payment=${{ steps.image.outputs.prefix }}-payment:${{ github.sha }} \
+            -n "${NAMESPACE}"
+
+      # 23. Update Product deployment
+      - name: Update Product Image
+        run: |
+          kubectl set image deployment/product \
+            product=${{ steps.image.outputs.prefix }}-product:${{ github.sha }} \
+            -n "${NAMESPACE}"
+
+      # 24. Wait for all rolling updates to complete
+      - name: Verify Deployment Rollouts
+        shell: bash
+        run: |
+          set -e
+
+          kubectl rollout status deployment/frontend -n "${NAMESPACE}" --timeout=180s
+          kubectl rollout status deployment/login -n "${NAMESPACE}" --timeout=180s
+          kubectl rollout status deployment/payment -n "${NAMESPACE}" --timeout=180s
+          kubectl rollout status deployment/product -n "${NAMESPACE}" --timeout=180s
+
+      # 25. Display final cluster state
+      - name: Display Cluster Resources
+        if: always()
+        shell: bash
+        run: |
+          echo "Namespaces:"
+          kubectl get namespaces || true
+
+          echo "Deployments:"
+          kubectl get deployments -n "${NAMESPACE}" || true
+
+          echo "Services:"
+          kubectl get services -n "${NAMESPACE}" || true
+
+          echo "Pods:"
+          kubectl get pods -n "${NAMESPACE}" -o wide || true
